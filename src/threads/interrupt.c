@@ -62,7 +62,7 @@ static void unexpected_interrupt (const struct intr_frame *);
 
 /* Returns the current interrupt status. */
 enum intr_level
-intr_get_level (void) 
+ intr_get_level (void) 
 {
   uint32_t flags;
 

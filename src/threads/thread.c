@@ -24,6 +24,8 @@
    that are ready to run but not actually running. */
 static struct list ready_list;
 
+static struct list wait_list;
+
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
@@ -92,12 +94,13 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
-
+  list_init (&wait_list);
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
+  initial_thread->sleep_ticks = 0;
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -120,7 +123,7 @@ thread_start (void)
 /* Called by the timer interrupt handler at each timer tick.
    Thus, this function runs in an external interrupt context. */
 void
-thread_tick (void) 
+thread_tick (int64_t ticks) 
 {
   struct thread *t = thread_current ();
 
@@ -133,6 +136,8 @@ thread_tick (void)
 #endif
   else
     kernel_ticks++;
+
+  thread_wake (ticks);
 
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
@@ -240,6 +245,34 @@ thread_unblock (struct thread *t)
   list_push_back (&ready_list, &t->elem);
   t->status = THREAD_READY;
   intr_set_level (old_level);
+}
+
+void
+thread_sleep_until (int64_t wake_tick)
+{
+  struct thread *t = thread_current ();
+  t->sleep_ticks = wake_tick;
+
+  list_push_back (&wait_list, &t->waitelem);
+
+  thread_block ();
+}
+
+void
+thread_wake (int64_t ticks)
+{
+  struct list_elem *e;
+
+  ASSERT (intr_get_level () == INTR_OFF);
+  for (e = list_begin (&wait_list); e != list_end (&wait_list); e = list_next (e))
+    {
+      struct thread *t = list_entry(e, struct thread, waitelem);
+      if (t->sleep_ticks <= ticks) {
+        t->sleep_ticks = 0;
+        list_remove (&t->waitelem);
+        thread_unblock (t);
+      }
+    }
 }
 
 /* Returns the name of the running thread. */

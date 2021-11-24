@@ -89,9 +89,12 @@ struct thread
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
+    struct list_elem waitelem;
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
+
+   int64_t sleep_ticks;                 /* Ticks when awake */
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -110,7 +113,7 @@ extern bool thread_mlfqs;
 void thread_init (void);
 void thread_start (void);
 
-void thread_tick (void);
+void thread_tick (int64_t ticks);
 void thread_print_stats (void);
 
 typedef void thread_func (void *aux);
@@ -118,6 +121,9 @@ tid_t thread_create (const char *name, int priority, thread_func *, void *);
 
 void thread_block (void);
 void thread_unblock (struct thread *);
+
+void thread_sleep_until (int64_t wake_tick);
+void thread_wake (int64_t ticks);
 
 struct thread *thread_current (void);
 tid_t thread_tid (void);
