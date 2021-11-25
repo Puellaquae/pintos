@@ -93,7 +93,7 @@ struct thread
     struct list_elem waitelem;          /* List element for wait threads list. */
 
     /* Shared between thread.c and synch.c. */
-    struct list_elem elem;              /* List element in ready list. */
+    struct list_elem elem;              /* List element in ready list or sema waiters. */
 
     int64_t sleep_ticks;                /* Ticks when awake */
 

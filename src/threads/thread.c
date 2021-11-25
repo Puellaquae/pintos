@@ -215,8 +215,9 @@ thread_create (const char *name, int priority,
   return tid;
 }
 
+/* Use in ready list and sema waiters. */
 bool
-thread_priority_compare(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+thread_priority_greater_compare(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
 {
   struct thread *ta = list_entry(a, struct thread, elem);
   struct thread *tb = list_entry(b, struct thread, elem);
@@ -260,8 +261,15 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_insert_ordered (&ready_list, &t->elem, thread_priority_compare, NULL);
+  list_insert_ordered (&ready_list, &t->elem, thread_priority_greater_compare, NULL);
   t->status = THREAD_READY;
+
+  struct thread *t_current = thread_current ();
+  if (t_current != idle_thread && t_current->priority < t->priority)
+    {
+      thread_yield ();
+    }
+
   intr_set_level (old_level);
 }
 
@@ -361,7 +369,7 @@ thread_yield (void)
   old_level = intr_disable ();
   if (cur != idle_thread) 
     {
-      list_insert_ordered (&ready_list, &cur->elem, thread_priority_compare, NULL);
+      list_insert_ordered (&ready_list, &cur->elem, thread_priority_greater_compare, NULL);
     }
   cur->status = THREAD_READY;
   schedule ();
@@ -390,7 +398,14 @@ void
 thread_set_priority (int new_priority) 
 {
   thread_current ()->priority = new_priority;
-  thread_yield ();
+  if (!list_empty (&ready_list)) 
+    {
+      struct thread *next = list_entry (list_begin(&ready_list), struct thread, elem);
+      if (next != NULL && next->priority > new_priority) 
+        {
+          thread_yield();
+        }
+    }
 }
 
 /* Returns the current thread's priority. */
@@ -520,7 +535,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable ();
-  list_insert_ordered (&all_list, &t->allelem, thread_priority_compare, NULL);
+  list_push_back (&all_list, &t->allelem);
   intr_set_level (old_level);
 }
 
