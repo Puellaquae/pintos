@@ -121,6 +121,9 @@ sema_up (struct semaphore *sema)
 
   if (!list_empty (&sema->waiters)) 
     {
+      /* Thread priority in waiters maybe changed for priority donated. */
+      list_sort (&sema->waiters, thread_priority_greater_compare, NULL);
+
       t = list_entry (list_pop_front (&sema->waiters), struct thread, elem);
       thread_unblock (t);
     }
@@ -202,6 +205,18 @@ lock_init (struct lock *lock)
   sema_init (&lock->semaphore, 1);
 }
 
+bool
+lock_priority_greater_compare(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+{
+  struct lock *la = list_entry(a, struct lock, elem);
+  struct lock *lb = list_entry(b, struct lock, elem);
+
+  ASSERT (la != NULL);
+  ASSERT (lb != NULL);
+
+  return la->highest_priority > lb->highest_priority;
+}
+
 /* Acquires LOCK, sleeping until it becomes available if
    necessary.  The lock must not already be held by the current
    thread.
@@ -217,8 +232,38 @@ lock_acquire (struct lock *lock)
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
 
+  struct lock *l_current = lock;
+  struct thread *t_holder = lock->holder;
+  struct thread *t_current = thread_current ();
+
+  t_current->waiting_lock = lock;
+
+  if (t_holder == NULL)
+    {
+      l_current->highest_priority = t_current->priority;
+    }
+
+  while (t_holder != NULL && t_holder->priority < t_current->priority)
+    {
+      thread_priority_donate (t_holder, t_current->priority);
+      if (l_current->highest_priority < t_current->priority)
+        {
+          l_current->highest_priority = t_current->priority;
+        }
+
+      l_current = t_holder->waiting_lock;
+      if (l_current == NULL)
+        {
+          break;
+        }
+      t_holder = l_current->holder;
+    }
+
   sema_down (&lock->semaphore);
   lock->holder = thread_current ();
+
+  lock->holder->waiting_lock = NULL;
+  list_insert_ordered (&lock->holder->locks, &lock->elem, lock_priority_greater_compare, NULL);
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -252,10 +297,26 @@ lock_release (struct lock *lock)
   ASSERT (lock != NULL);
   ASSERT (lock_held_by_current_thread (lock));
 
+  struct thread *t = lock->holder;
+
   lock->holder = NULL;
   sema_up (&lock->semaphore);
 
-  thread_yield ();
+  list_remove (&lock->elem);
+
+  if (list_empty (&t->locks))
+    {
+      thread_priority_donate(t, t->origin_priority);
+    }
+  else
+    {
+      /* Lock's highest priority maybe changed for priority donate. */
+      list_sort (&t->locks, lock_priority_greater_compare, NULL);
+      struct lock *l = list_entry (list_front (&t->locks), struct lock, elem);
+      thread_priority_donate(t, l->highest_priority);
+    }
+  
+  // thread_yield ();
 }
 
 /* Returns true if the current thread holds LOCK, false
@@ -274,7 +335,7 @@ struct semaphore_elem
   {
     struct list_elem elem;              /* List element. */
     struct semaphore semaphore;         /* This semaphore. */
-    int priortiy;
+    int priortiy;                       /* Priority of cond's waiter */
   };
 
 bool

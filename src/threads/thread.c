@@ -397,7 +397,19 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
-  thread_current ()->priority = new_priority;
+  struct thread *t = thread_current ();
+
+  if (t->priority == t->origin_priority)
+    {
+      t->priority = new_priority;
+      t->origin_priority = new_priority;
+    }
+  else
+    {
+      /* If the current thread's priority is got by donation. */
+      t->origin_priority = new_priority;
+    }
+
   if (!list_empty (&ready_list)) 
     {
       struct thread *next = list_entry (list_begin(&ready_list), struct thread, elem);
@@ -414,6 +426,27 @@ thread_get_priority (void)
 {
   return thread_current ()->priority;
 }
+
+/* Donate the new priority to the thread t.
+   If donate priority to thread itself will make a priority preempting. */
+void
+thread_priority_donate (struct thread *t, int new_priority)
+{
+
+  t->priority = new_priority;
+  
+  // if current thread gets its priority decreased, then yield
+  // (foremost entry in ready_list shall have the highest priority)
+  if (t == thread_current () && !list_empty (&ready_list))
+    {
+      struct thread *next = list_entry(list_begin(&ready_list), struct thread, elem);
+      if (next != NULL && next->priority > new_priority) 
+        {
+          thread_yield();
+        } 
+    }
+}
+
 
 /* Sets the current thread's nice value to NICE. */
 void
@@ -532,7 +565,11 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
+  t->origin_priority = priority;
+
   t->magic = THREAD_MAGIC;
+
+  list_init (&t->locks);
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
