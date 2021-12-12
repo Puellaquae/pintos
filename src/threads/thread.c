@@ -272,6 +272,7 @@ thread_unblock (struct thread *t)
   t->status = THREAD_READY;
 
   struct thread *t_current = thread_current ();
+  // Don't do preempt here because thread_yield can't used in interrupt while thread_wake need run in interrupt.
   //if (t_current != idle_thread && t_current->priority < t->priority)
   //  {
   //    thread_yield ();
