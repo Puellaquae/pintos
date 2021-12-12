@@ -4,6 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include "fixed_point.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -101,6 +102,9 @@ struct thread
 
     int64_t sleep_ticks;                /* Ticks when awake */
 
+    int nice;
+    fixed_t recent_cpu;
+
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
@@ -150,5 +154,8 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+void thread_mlfqs_update_priority (struct thread *t);
+void thread_mlfqs_increase_recent_cpu (void);
+void thread_mlfqs_update_load_avg_and_recent_cpu (void);
 
 #endif /* threads/thread.h */
