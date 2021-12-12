@@ -112,12 +112,12 @@ thread_init (void)
 void
 thread_start (void) 
 {
-  load_avg = FP_CONST (0);
-
   /* Create the idle thread. */
   struct semaphore idle_started;
   sema_init (&idle_started, 0);
   thread_create ("idle", PRI_MIN, idle, &idle_started);
+
+  load_avg = FP_CONST (0);
 
   /* Start preemptive thread scheduling. */
   intr_enable ();
@@ -129,7 +129,7 @@ thread_start (void)
 /* Called by the timer interrupt handler at each timer tick.
    Thus, this function runs in an external interrupt context. */
 void
-thread_tick (int64_t ticks) 
+thread_tick (int64_t ticks UNUSED) 
 {
   struct thread *t = thread_current ();
 
@@ -142,8 +142,6 @@ thread_tick (int64_t ticks)
 #endif
   else
     kernel_ticks++;
-
-  thread_wake (ticks);
 
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
@@ -194,6 +192,8 @@ thread_create (const char *name, int priority,
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
 
+  enum intr_level old_level = intr_disable ();
+
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame (t, sizeof *kf);
   kf->eip = NULL;
@@ -208,6 +208,8 @@ thread_create (const char *name, int priority,
   sf = alloc_frame (t, sizeof *sf);
   sf->eip = switch_entry;
   sf->ebp = 0;
+
+  intr_set_level (old_level);
 
   /* Add to run queue. */
   thread_unblock (t);
@@ -270,10 +272,10 @@ thread_unblock (struct thread *t)
   t->status = THREAD_READY;
 
   struct thread *t_current = thread_current ();
-  if (t_current != idle_thread && t_current->priority < t->priority)
-    {
-      thread_yield ();
-    }
+  //if (t_current != idle_thread && t_current->priority < t->priority)
+  //  {
+  //    thread_yield ();
+  //  }
 
   intr_set_level (old_level);
 }
@@ -428,7 +430,7 @@ thread_set_priority (int new_priority)
       struct thread *next = list_entry (list_begin(&ready_list), struct thread, elem);
       if (next != NULL && next->priority > new_priority) 
         {
-          thread_yield();
+          thread_yield ();
         }
     }
 
@@ -447,19 +449,27 @@ thread_get_priority (void)
 void
 thread_priority_donate (struct thread *t, int new_priority)
 {
+  if (thread_mlfqs)
+    {
+      return;
+    }
 
   t->priority = new_priority;
   
+  enum intr_level old_level = intr_disable ();
+
   // if current thread gets its priority decreased, then yield
   // (foremost entry in ready_list shall have the highest priority)
   if (t == thread_current () && !list_empty (&ready_list))
     {
-      struct thread *next = list_entry(list_begin(&ready_list), struct thread, elem);
+      struct thread *next = list_entry (list_begin (&ready_list), struct thread, elem);
       if (next != NULL && next->priority > new_priority) 
         {
-          thread_yield();
+          thread_yield ();
         } 
     }
+
+  intr_set_level (old_level);
 }
 
 

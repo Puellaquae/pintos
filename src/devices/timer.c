@@ -191,6 +191,7 @@ timer_interrupt (struct intr_frame *args UNUSED)
           thread_mlfqs_update_priority (thread_current ());
         }
     } 
+  thread_wake (ticks);
   
   intr_set_level (old_level);
 
