@@ -9,7 +9,6 @@
 #include "threads/intr-stubs.h"
 #include "threads/palloc.h"
 #include "threads/switch.h"
-#include "threads/synch.h"
 #include "threads/vaddr.h"
 #include "devices/timer.h"
 #ifdef USERPROG
@@ -190,7 +189,18 @@ thread_create (const char *name, int priority,
 
   /* Initialize thread. */
   init_thread (t, name, priority);
-  tid = t->tid = allocate_tid ();
+
+#ifdef USERPROG
+
+  t->child_info = malloc (sizeof (struct child_info));
+
+  sema_init (&t->child_info->sema, 0);
+
+  list_push_back (&t->parent->children, &t->child_info->childelem);
+
+  tid = t->tid = t->child_info->tid = allocate_tid ();
+
+#endif
 
   enum intr_level old_level = intr_disable ();
 
@@ -358,6 +368,13 @@ thread_exit (void)
      and schedule another process.  That process will destroy us
      when it calls thread_schedule_tail(). */
   intr_disable ();
+
+#ifdef USERPROG
+  printf ("%s: exit(%d)\n", thread_name (), thread_current ()->exit_code);
+  thread_current ()->child_info->exit_code = thread_current ()->exit_code;
+  sema_up (&thread_current ()->child_info->sema);
+#endif
+
   list_remove (&thread_current()->allelem);
   thread_current ()->status = THREAD_DYING;
   schedule ();
@@ -654,6 +671,24 @@ init_thread (struct thread *t, const char *name, int priority)
   t->magic = THREAD_MAGIC;
 
   list_init (&t->locks);
+
+#ifdef USERPROG
+
+  list_init (&t->children);
+
+  
+  t->exit_code = INT32_MAX;
+
+  if (t == initial_thread) 
+    {
+      t->parent = NULL;
+    }
+  else 
+    {
+      t->parent = thread_current ();
+    }
+
+#endif
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);

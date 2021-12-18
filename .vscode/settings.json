@@ -1,0 +1,10 @@
+{
+    "C_Cpp.default.defines": [
+        "USERPROG",
+        "FILESYS"
+    ],
+    "files.associations": {
+        "lib.h": "c",
+        "synch.h": "c"
+    }
+}

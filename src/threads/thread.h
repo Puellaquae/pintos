@@ -5,6 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 #include "fixed_point.h"
+#include "threads/synch.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -24,6 +25,20 @@ typedef int tid_t;
 #define PRI_MIN 0                       /* Lowest priority. */
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
+
+
+#ifdef USERPROG
+/* Thread info used in parent thread's children list.
+   If store in thread, it will be freed after thread exit. */
+struct child_info
+  {
+    tid_t tid;
+    struct list_elem childelem;   /* Used in parent thread's children list. */
+    int exit_code;
+    struct thread *thread;
+    struct semaphore sema;
+  };
+#endif
 
 /* A kernel thread or user process.
 
@@ -108,6 +123,10 @@ struct thread
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
+    struct thread *parent;              /* The thread of who create this thread. */
+    struct list children;               /* The thread that this thread created. */
+    struct child_info *child_info;      /* Child thread info for parent thread use. */
+    int exit_code;                      /* Thread exit code, INT32_MAX for running. */
 #endif
 
     /* Owned by thread.c. */

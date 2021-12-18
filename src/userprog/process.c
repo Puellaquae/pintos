@@ -17,9 +17,13 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "threads/synch.h"
+#include "devices/timer.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
+
+void push_argments (void **esp, int argc, char *argv[]);
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -28,20 +32,37 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
 tid_t
 process_execute (const char *file_name) 
 {
-  char *fn_copy;
+  char *fn_copy, *fn_copy2;
   tid_t tid;
 
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
-  if (fn_copy == NULL)
+  fn_copy2 = palloc_get_page (0);
+  if (fn_copy == NULL || fn_copy2 == NULL)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
+  strlcpy (fn_copy2, file_name, PGSIZE);
+
+  char *save_ptr;
+  char *cmd = strtok_r (fn_copy2, " ", &save_ptr);
 
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  tid = thread_create (cmd, PRI_DEFAULT, start_process, fn_copy);
+  palloc_free_page (fn_copy2); 
   if (tid == TID_ERROR)
+    {
+      palloc_free_page (fn_copy); 
     palloc_free_page (fn_copy); 
+      palloc_free_page (fn_copy); 
+    palloc_free_page (fn_copy); 
+      palloc_free_page (fn_copy); 
+    palloc_free_page (fn_copy); 
+      palloc_free_page (fn_copy); 
+    palloc_free_page (fn_copy); 
+      palloc_free_page (fn_copy); 
+    }
+
   return tid;
 }
 
@@ -54,17 +75,40 @@ start_process (void *file_name_)
   struct intr_frame if_;
   bool success;
 
+  char *fn_copy = malloc (strlen (file_name) + 1);
+  strlcpy (fn_copy, file_name, strlen (file_name) + 1);
+
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  success = load (file_name, &if_.eip, &if_.esp);
+
+  char *save_ptr;
+  char *exec_file_name = strtok_r (file_name, " ", &save_ptr);
+
+  success = load (exec_file_name, &if_.eip, &if_.esp);
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
   if (!success) 
-    thread_exit ();
+    {
+      thread_exit ();
+    }
+  else 
+    {
+      int argc = 0;
+      char *argv[255];
+      char *arg;
+      for (arg = strtok_r(fn_copy, " ", &save_ptr); arg != NULL; arg = strtok_r (NULL, " ", &save_ptr))
+        {
+          if_.esp -= (strlen (arg) + 1);
+          memcpy (if_.esp, arg, strlen (arg) + 1);
+          argv[argc++] = if_.esp;
+        }
+
+      push_argments (&if_.esp, argc, argv);
+    }
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -74,6 +118,26 @@ start_process (void *file_name_)
      and jump to it. */
   asm volatile ("movl %0, %%esp; jmp intr_exit" : : "g" (&if_) : "memory");
   NOT_REACHED ();
+}
+
+void 
+push_argments (void **esp, int argc, char *argv[])
+{
+  *esp = (int)(*esp) & 0xfffffffc;
+  *esp -= 4;
+  *(int *)*esp = 0;
+
+  for (int i = argc - 1; i >= 0; i--)
+    {
+      *esp -= 4;
+      *(int *) *esp = argv[i];
+    }
+  *esp -= 4;
+  *(int *)*esp = (int) *esp + 4;
+  *esp -= 4;
+  *(int *)*esp = argc;
+  *esp -= 4;
+  *(int *)*esp = 0;
 }
 
 /* Waits for thread TID to die and returns its exit status.  If
@@ -86,8 +150,22 @@ start_process (void *file_name_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) 
+process_wait (tid_t child_tid) 
 {
+  struct list *children = &thread_current ()->children;
+  for (struct list_elem *child = list_begin (children); child != list_end (children); child = list_next (child))
+    {
+      struct child_info *child_t = list_entry (child, struct child_info, childelem);
+      if (child_t->tid == child_tid)
+        {
+          struct list_elem child_cpy;
+          child_cpy = *child;
+          sema_down (&child_t->sema);
+          list_remove (&child_cpy);
+          return list_entry (child, struct child_info, childelem)->exit_code;
+        }
+    }
+
   return -1;
 }
 
