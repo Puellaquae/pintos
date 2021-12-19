@@ -55,6 +55,12 @@ process_execute (const char *file_name)
       palloc_free_page (fn_copy); 
     }
 
+  sema_down (&thread_current ()->sema);
+  if (!thread_current ()->child_success)
+    {
+      tid = TID_ERROR;
+    }
+
   return tid;
 }
 
@@ -85,6 +91,8 @@ start_process (void *file_name_)
   palloc_free_page (file_name);
   if (!success) 
     {
+      thread_current ()->parent->child_success = 0;
+      sema_up (&thread_current ()->parent->sema);
       thread_exit ();
     }
   else 
@@ -99,7 +107,9 @@ start_process (void *file_name_)
           argv[argc++] = if_.esp;
         }
 
-      push_argments (&if_.esp, argc, argv);
+      push_argments (&if_.esp, argc, argv); 
+      thread_current ()->parent->child_success = 1;
+      sema_up (&thread_current ()->parent->sema);
     }
 
   /* Start the user process by simulating a return from an
@@ -291,8 +301,10 @@ load (const char *file_name, void (**eip) (void), void **esp)
     goto done;
   process_activate ();
 
+  acquire_file_lock ();
   /* Open executable file. */
   file = filesys_open (file_name);
+  
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", file_name);
@@ -380,9 +392,11 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   success = true;
 
+  file_deny_write (file);
+  thread_current ()->self_exec_file = file;
  done:
   /* We arrive here whether the load is successful or not. */
-  file_close (file);
+  release_file_lock ();
   return success;
 }
 

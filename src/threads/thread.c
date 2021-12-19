@@ -42,6 +42,11 @@ static struct lock tid_lock;
 
 static fixed_t load_avg;
 
+#ifdef USERPROG
+/* Lock process when do file operation */
+static struct lock file_lock;
+#endif
+
 /* Stack frame for kernel_thread(). */
 struct kernel_thread_frame 
   {
@@ -98,6 +103,11 @@ thread_init (void)
   list_init (&ready_list);
   list_init (&all_list);
   list_init (&wait_list);
+
+#ifdef USERPROG
+  lock_init (&file_lock);
+#endif
+
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
   init_thread (initial_thread, "main", PRI_DEFAULT);
@@ -124,6 +134,20 @@ thread_start (void)
   /* Wait for the idle thread to initialize idle_thread. */
   sema_down (&idle_started);
 }
+
+#ifdef USERPROG
+void 
+acquire_file_lock (void)
+{
+  lock_acquire (&file_lock);
+}
+
+void 
+release_file_lock (void)
+{
+  lock_release (&file_lock);
+}
+#endif
 
 /* Called by the timer interrupt handler at each timer tick.
    Thus, this function runs in an external interrupt context. */
@@ -370,8 +394,24 @@ thread_exit (void)
   intr_disable ();
 
 #ifdef USERPROG
-  printf ("%s: exit(%d)\n", thread_name (), thread_current ()->exit_code);
-  thread_current ()->child_info->exit_code = thread_current ()->exit_code;
+  struct thread *cur = thread_current ();
+  printf ("%s: exit(%d)\n", cur->name, cur->exit_code);
+  cur->child_info->exit_code = cur->exit_code;
+
+  if (lock_held_by_current_thread (&file_lock))
+    {
+      release_file_lock ();
+    }
+
+  acquire_file_lock ();
+  while (!list_empty (&cur->files))
+    {
+      struct file_elem *f = list_entry (list_pop_front (&cur->files), struct file_elem, elem);
+      file_close (f->file);
+      free (f);
+    }
+  file_close (cur->self_exec_file);
+  release_file_lock ();
   sema_up (&thread_current ()->child_info->sema);
 #endif
 
@@ -675,10 +715,13 @@ init_thread (struct thread *t, const char *name, int priority)
 #ifdef USERPROG
 
   list_init (&t->children);
-
+  list_init (&t->files);
+  sema_init (&t->sema, 0);
   
-  t->exit_code = INT32_MAX;
-
+  t->exit_code = -1;
+  /* Skip stdin stdout */
+  t->fd_counter = 2;
+  t->self_exec_file = NULL;
   if (t == initial_thread) 
     {
       t->parent = NULL;

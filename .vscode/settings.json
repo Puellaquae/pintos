@@ -5,6 +5,16 @@
     ],
     "files.associations": {
         "lib.h": "c",
-        "synch.h": "c"
+        "synch.h": "c",
+        "process.h": "c",
+        "*.inc": "c",
+        "*.tcc": "c",
+        "fstream": "c",
+        "iosfwd": "c",
+        "istream": "c",
+        "limits": "c",
+        "sstream": "c",
+        "streambuf": "c",
+        "syscall.h": "c"
     }
 }

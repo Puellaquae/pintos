@@ -38,6 +38,13 @@ struct child_info
     struct thread *thread;
     struct semaphore sema;
   };
+
+struct file_elem
+  {
+    int fd;
+    struct file *file;
+    struct list_elem elem;
+  };
 #endif
 
 /* A kernel thread or user process.
@@ -126,7 +133,12 @@ struct thread
     struct thread *parent;              /* The thread of who create this thread. */
     struct list children;               /* The thread that this thread created. */
     struct child_info *child_info;      /* Child thread info for parent thread use. */
-    int exit_code;                      /* Thread exit code, INT32_MAX for running. */
+    int exit_code;                      /* Thread exit code, -1 for init. */
+    struct semaphore sema;              /* Semaphore for child process to block parent until program loaded. */
+    int child_success;                  /* Keep whether child process is start successfully;. */
+    struct list files;                  /* List of opened files. */
+    int fd_counter;                     /* For get next fd. */
+    struct file *self_exec_file;        /* Its executable file */
 #endif
 
     /* Owned by thread.c. */
@@ -140,6 +152,11 @@ extern bool thread_mlfqs;
 
 void thread_init (void);
 void thread_start (void);
+
+#ifdef USERPROG
+void acquire_file_lock (void);
+void release_file_lock (void);
+#endif
 
 void thread_tick (int64_t ticks);
 void thread_print_stats (void);
