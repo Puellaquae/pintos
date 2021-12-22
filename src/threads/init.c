@@ -285,7 +285,15 @@ run_task (char **argv)
   
   printf ("Executing '%s':\n", task);
 #ifdef USERPROG
-  process_wait (process_execute (task));
+/* Special code for school's old makefiles */
+  if (!strcmp (task, "fp-kasm") || !strcmp (task, "fp-kinit"))
+    {
+      run_userprog_test(task);
+    }
+  else
+    {
+      process_wait (process_execute (task));
+    }
 #else
   run_test (task);
 #endif
