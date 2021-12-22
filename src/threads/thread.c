@@ -245,6 +245,13 @@ thread_create (const char *name, int priority,
 
   intr_set_level (old_level);
 
+  struct thread *cur_t = thread_current ();
+
+  asm volatile ("fsave %0"::"m"(cur_t->fpu_state[0]));
+  asm volatile ("fninit");
+  asm volatile ("fsave %0"::"m"(t->fpu_state[0]));
+  asm volatile ("frstor %0"::"m"(cur_t->fpu_state[0]));
+
   /* Add to run queue. */
   thread_unblock (t);
 
@@ -395,7 +402,6 @@ thread_exit (void)
 
 #ifdef USERPROG
   struct thread *cur = thread_current ();
-  printf ("%s: exit(%d)\n", cur->name, cur->exit_code);
   cur->child_info->exit_code = cur->exit_code;
 
   if (lock_held_by_current_thread (&file_lock))
@@ -830,7 +836,12 @@ schedule (void)
   ASSERT (is_thread (next));
 
   if (cur != next)
-    prev = switch_threads (cur, next);
+    {
+      asm volatile ("fsave %0"::"m"(cur->fpu_state[0]));
+      asm volatile ("fninit");
+      asm volatile ("frstor %0"::"m"(next->fpu_state[0]));
+      prev = switch_threads (cur, next);
+    }
   thread_schedule_tail (prev);
 }
 

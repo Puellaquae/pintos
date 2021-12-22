@@ -15,6 +15,7 @@
         "limits": "c",
         "sstream": "c",
         "streambuf": "c",
-        "syscall.h": "c"
+        "syscall.h": "c",
+        "cstdlib": "c"
     }
 }

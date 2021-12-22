@@ -61,6 +61,34 @@
           retval;                                               \
         })
 
+/* For CS162 */
+
+int 
+practice(int i) 
+{ 
+  return syscall1(SYS_PRACTICE, i); 
+}
+
+/* Invokes syscall NUMBER, passing argument ARG0, and returns the
+   return value as a `double'. */
+#define syscall1f(NUMBER, ARG0)                                                                    \
+  ({                                                                                               \
+    float retval;                                                                                  \
+    asm volatile("pushl %[arg0]; pushl %[number]; int $0x30; addl $8, %%esp"                       \
+                 : "=a"(retval)                                                                    \
+                 : [number] "i"(NUMBER), [arg0] "g"(ARG0)                                          \
+                 : "memory");                                                                      \
+    retval;                                                                                        \
+  })
+
+double 
+compute_e(int n) 
+{ 
+  return (double)syscall1f(SYS_COMPUTE_E, n); 
+}
+
+/* For CS162 End */
+
 void
 halt (void) 
 {

@@ -26,6 +26,7 @@ typedef int tid_t;
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
 
+#define FPU_SIZE 108
 
 #ifdef USERPROG
 /* Thread info used in parent thread's children list.
@@ -126,6 +127,8 @@ struct thread
 
     int nice;
     fixed_t recent_cpu;
+
+    uint8_t fpu_state[FPU_SIZE];
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */

@@ -35,6 +35,11 @@ void fail (const char *, ...) PRINTF_FORMAT (1, 2) NO_RETURN;
           }                                     \
         while (0)
 
+/* For CS162 */
+void push_values_to_fpu(int* values, int n);
+bool pop_values_from_fpu(int* values, int n);
+/* For CS162 End */
+
 void shuffle (void *, size_t cnt, size_t size);
 
 void exec_children (const char *child_name, pid_t pids[], size_t child_cnt);

@@ -292,6 +292,18 @@ run_task (char **argv)
   printf ("Execution of '%s' complete.\n", task);
 }
 
+
+/* CS162: Runs the userprog kernel task specified in ARGV[1]. */
+static void run_userprog_kernel_task(char** argv) {
+  const char* task = argv[1];
+
+  printf("Executing '%s':\n", task);
+#ifdef USERPROG
+  run_userprog_test(task);
+#endif
+  printf("Execution of '%s' complete.\n", task);
+}
+
 /* Executes all of the actions specified in ARGV[]
    up to the null pointer sentinel. */
 static void
@@ -309,6 +321,7 @@ run_actions (char **argv)
   static const struct action actions[] = 
     {
       {"run", 2, run_task},
+      {"rukt", 2, run_userprog_kernel_task},
 #ifdef FILESYS
       {"ls", 1, fsutil_ls},
       {"cat", 2, fsutil_cat},

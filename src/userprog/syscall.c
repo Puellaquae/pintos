@@ -7,6 +7,7 @@
 #include "userprog/process.h"
 #include "filesys/filesys.h"
 #include "filesys/file.h"
+#include <float.h>
 
 #define MAX_SYSCALLS 20
 
@@ -29,6 +30,8 @@ handler_t sys_write;
 handler_t sys_seek;
 handler_t sys_tell;
 handler_t sys_close;
+handler_t sys_practice;
+handler_t sys_compute_e;
 
 typedef struct syscall_desc {
   char* name;
@@ -54,6 +57,8 @@ syscall_init (void)
   DECLARE_SYSCALL(SYS_CLOSE, sys_close);
   DECLARE_SYSCALL(SYS_READ, sys_read);
   DECLARE_SYSCALL(SYS_FILESIZE, sys_filesize);
+  DECLARE_SYSCALL(SYS_PRACTICE, sys_practice);
+  DECLARE_SYSCALL(SYS_COMPUTE_E, sys_compute_e);
 }
 
 /* Reads a byte at user virtual address UADDR.
@@ -357,4 +362,28 @@ sys_close (struct intr_frame *f)
       list_remove (&file_elem->elem);
       free (file_elem);
     }
+}
+
+void 
+sys_practice (struct intr_frame *f)
+{
+  uint32_t *ptr = f->esp;
+  int n = *(int *)check_ptr (++ptr);
+  int ret_val;
+
+  ret_val = n + 1;
+
+  f->eax = ret_val;
+}
+
+void 
+sys_compute_e (struct intr_frame *f)
+{
+  uint32_t *ptr = f->esp;
+  int n = *(int *)check_ptr (++ptr);
+  int ret_val;
+
+  ret_val = sys_sum_to_e (n);
+
+  f->eax = ret_val;
 }

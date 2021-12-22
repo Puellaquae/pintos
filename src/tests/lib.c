@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <syscall.h>
+#include <float.h>
 
 const char *test_name;
 bool quiet = false;
@@ -61,6 +62,31 @@ swap (void *a_, void *b_, size_t size)
       a[i] = b[i];
       b[i] = t;
     }
+}
+
+/* Pushes hardcoded values to the FPU */
+void 
+push_values_to_fpu(int* values, int n) 
+{
+  for (int i = 0; i < n; i++) 
+    {
+      fpu_push(values[i]);
+    }
+}
+
+/* Pops hardcoded values from FPU and returns if the values are correct */
+bool 
+pop_values_from_fpu(int* values, int n) 
+{
+  for (int i = n - 1; i >= 0; i--) 
+    {
+      int real = fpu_pop();
+      if (values[i] != real)
+        {
+          return false;
+        }
+    }
+  return true;
 }
 
 void

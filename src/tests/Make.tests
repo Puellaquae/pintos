@@ -52,6 +52,9 @@ $(foreach test,$(TESTS),$(eval $(test).result: $(test).output $(test).ck))
 # Prevent an environment variable VERBOSE from surprising us.
 VERBOSE =
 
+# Use rukt/rtkt to run kernel-only tests for userprog/threads, respectively
+RUNCMD = run
+
 TESTCMD = pintos -v -k -T $(TIMEOUT)
 TESTCMD += $(SIMULATOR)
 TESTCMD += $(PINTOSOPTS)
@@ -67,7 +70,7 @@ TESTCMD += $(KERNELFLAGS)
 ifeq ($(filter userprog, $(KERNEL_SUBDIRS)), userprog)
 TESTCMD += -f
 endif
-TESTCMD += $(if $($(TEST)_ARGS),run '$(*F) $($(TEST)_ARGS)',run $(*F))
+TESTCMD += $(if $($(TEST)_ARGS),$(RUNCMD) '$(*F) $($(TEST)_ARGS)',$(RUNCMD) $(*F))
 TESTCMD += < /dev/null
 TESTCMD += 2> $(TEST).errors $(if $(VERBOSE),|tee,>) $(TEST).output
 %.output: kernel.bin loader.bin
